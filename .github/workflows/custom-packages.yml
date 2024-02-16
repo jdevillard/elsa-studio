@@ -46,13 +46,9 @@ jobs:
           npm install --force
           npm run build
       # Setup .NET Core SDK
-      - name: Setup .NET Core
-        uses: actions/setup-dotnet@v3
-        with:
-          source-url: ${{ env.AZURE_ARTIFACTS_FEED_URL }}
-        env:
-          NUGET_AUTH_TOKEN: ${{secrets.AZURE_DEVOPS_PAT}}
-
+      - name: Add Custom Source
+        shell: bash
+        run: dotnet nuget add source ${{ env.AZURE_ARTIFACTS_FEED_URL }} --name "custom-feed" --username az --password ${{ secrets.AZURE_DEVOPS_PAT }} --store-password-in-clear-text
       - name: Build nuget packages
         run: dotnet build Elsa.Studio.sln --configuration Release /p:Version=${VERSION}
       - name: Test

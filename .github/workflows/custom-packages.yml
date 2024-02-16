@@ -98,4 +98,4 @@ jobs:
         env:
           NUGET_AUTH_TOKEN: ${{secrets.AZURE_DEVOPS_PAT}}
       - name: Publish to custom feed
-        run: dotnet nuget push *.nupkg --api-key AureArtifacts --skip-duplicate
+        run: dotnet nuget push ./elsa-studio-nuget-packages/*.nupkg --api-key AureArtifacts --skip-duplicate

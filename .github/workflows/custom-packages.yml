@@ -7,6 +7,7 @@ on:
   release:
     types: [ prereleased, published ]
 env:
+  base_version: '3.3.0'
   AZURE_ARTIFACTS_FEED_URL: ${{ secrets.AZURE_ARTIFACTS_FEED_URL}}
   package_number_reference: ${{ vars.PACKAGE_NUMBER_REFERENCE }}
   nuget_feed_feedzio: 'https://f.feedz.io/elsa-workflows/elsa-3/nuget/index.json'
@@ -33,7 +34,7 @@ jobs:
             TAG_NAME=${TAG_NAME#refs/tags/} # remove the refs/tags/ prefix
             echo "VERSION=${TAG_NAME}" >> $GITHUB_ENV
           else
-            echo "VERSION=3.1.0-preview.${{env.package_number_reference}}.${{github.run_number}}" >> $GITHUB_ENV
+            echo "VERSION=${{env.base_version}}-preview.${{env.package_number_reference}}.${{github.run_number}}" >> $GITHUB_ENV
           fi
       - name: Build workflow designer client assets
         working-directory: ./src/modules/Elsa.Studio.Workflows.Designer/ClientLib

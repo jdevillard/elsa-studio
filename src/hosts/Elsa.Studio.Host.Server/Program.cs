@@ -19,6 +19,7 @@ builder.Services.AddServerSideBlazor(options =>
 {
     // Register the root components.
     options.RootComponents.RegisterCustomElsaStudioElements();
+    options.RootComponents.MaxJSRootComponents = 1000;
 });
 
 // Register shell services and modules.
@@ -32,6 +33,7 @@ builder.Services.AddDashboardModule();
 builder.Services.AddWorkflowsModule();
 builder.Services.AddWorkflowContextsModule();
 builder.Services.AddWebhooksModule();
+builder.Services.AddAgentsModule();
 
 // Configure SignalR.
 builder.Services.AddSignalR(options =>

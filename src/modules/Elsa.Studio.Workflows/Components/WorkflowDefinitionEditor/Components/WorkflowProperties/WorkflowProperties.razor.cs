@@ -1,4 +1,5 @@
 using Elsa.Api.Client.Resources.WorkflowDefinitions.Models;
+using Elsa.Studio.Workflows.Shared.Args;
 using Microsoft.AspNetCore.Components;
 
 namespace Elsa.Studio.Workflows.Components.WorkflowDefinitionEditor.Components.WorkflowProperties;
@@ -6,5 +7,5 @@ namespace Elsa.Studio.Workflows.Components.WorkflowDefinitionEditor.Components.W
 public partial class WorkflowProperties
 {
     [Parameter] public WorkflowDefinition WorkflowDefinition { get; set; } = default!;
-    [Parameter] public Func<Task>? OnWorkflowDefinitionUpdated { get; set; }
+    [Parameter] public EventCallback WorkflowDefinitionUpdated { get; set; }
 }

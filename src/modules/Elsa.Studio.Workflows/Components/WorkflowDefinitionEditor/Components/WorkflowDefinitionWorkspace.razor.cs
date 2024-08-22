@@ -1,88 +1,105 @@
+using System.Text.Json.Nodes;
 using Elsa.Api.Client.Resources.WorkflowDefinitions.Models;
 using Elsa.Api.Client.Shared.Models;
 using Elsa.Studio.Workflows.Domain.Contracts;
+using Elsa.Studio.Workflows.Extensions;
 using Elsa.Studio.Workflows.UI.Contracts;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 
 namespace Elsa.Studio.Workflows.Components.WorkflowDefinitionEditor.Components;
 
-/// <summary>
 /// A workspace for editing a workflow definition.
-/// </summary>
 public partial class WorkflowDefinitionWorkspace : IWorkspace
 {
     private MudDynamicTabs _dynamicTabs = default!;
-
-    /// <summary>
+    private WorkflowDefinition? _workflowDefinition = default!;
+    private WorkflowDefinition? _selectedWorkflowDefinition = default!;
+    
     /// Gets or sets the workflow definition to edit.
-    /// </summary>
-    [Parameter]
-    public WorkflowDefinition WorkflowDefinition { get; set; } = default!;
-
-    /// <summary>
+    [Parameter] public WorkflowDefinition WorkflowDefinition { get; set; } = default!;
+    
     /// Gets or sets a specific version of the workflow definition to view.
-    /// </summary>
-    [Parameter]
-    public WorkflowDefinition SelectedWorkflowDefinition { get; set; } = default!;
+    [Parameter] public WorkflowDefinition SelectedWorkflowDefinition { get; set; } = default!;
 
     /// <summary>An event that is invoked when a workflow definition has been executed.</summary>
     /// <remarks>The ID of the workflow instance is provided as the value to the event callback.</remarks>
-    [Parameter]
-    public EventCallback<string> WorkflowDefinitionExecuted { get; set; }
-
-    /// <summary>
+    [Parameter] public EventCallback<string> WorkflowDefinitionExecuted { get; set; }
+    
     /// Gets or sets the event that occurs when the workflow definition version is updated.
-    /// </summary>
-    [Parameter]
-    public EventCallback<WorkflowDefinition> WorkflowDefinitionVersionSelected { get; set; }
+    [Parameter] public EventCallback<WorkflowDefinition> WorkflowDefinitionVersionSelected { get; set; }
+    
+    /// Gets or sets the event that occurs when an activity is selected.
+    [Parameter] public EventCallback<JsonObject> ActivitySelected { get; set; }
 
-    /// <summary>
     /// An event that is invoked when the workflow definition is updated.
-    /// </summary>
     public event Func<Task>? WorkflowDefinitionUpdated;
 
     /// <inheritdoc />
-    public bool IsReadOnly => SelectedWorkflowDefinition?.IsLatest == false;
+    public bool IsReadOnly => _selectedWorkflowDefinition.GetIsReadOnly();
+
+    /// <inheritdoc />
+    public bool HasWorkflowEditPermission => (_selectedWorkflowDefinition?.Links?.Count(l => l.Rel == "publish") ?? 0) > 0;
+
+    /// Gets the selected activity ID.
+    public string? SelectedActivityId => WorkflowEditor.SelectedActivityId;
 
     [Inject] private IWorkflowDefinitionService WorkflowDefinitionService { get; set; } = default!;
 
     private WorkflowEditor WorkflowEditor { get; set; } = default!;
 
     /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        _workflowDefinition = WorkflowDefinition;
+        _selectedWorkflowDefinition = SelectedWorkflowDefinition;
+    }
+
+    /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        if (SelectedWorkflowDefinition == null!)
-            SelectedWorkflowDefinition = WorkflowDefinition;
+        _workflowDefinition = WorkflowDefinition;
+        _selectedWorkflowDefinition = SelectedWorkflowDefinition;
+        
+        if (_selectedWorkflowDefinition == null)
+            _selectedWorkflowDefinition = _workflowDefinition;
     }
-
-    /// <summary>
+    
     /// Displays the specified workflow definition version.
-    /// </summary>
-    public void DisplayWorkflowDefinitionVersion(WorkflowDefinition workflowDefinition)
+    public async Task DisplayWorkflowDefinitionVersionAsync(WorkflowDefinition workflowDefinition)
     {
-        SelectedWorkflowDefinition = workflowDefinition;
+        _selectedWorkflowDefinition = workflowDefinition;
+        
+        if(workflowDefinition.IsLatest)
+            _workflowDefinition = workflowDefinition;
 
         if (WorkflowDefinitionVersionSelected.HasDelegate)
-            WorkflowDefinitionVersionSelected.InvokeAsync(SelectedWorkflowDefinition);
+            await WorkflowDefinitionVersionSelected.InvokeAsync(_selectedWorkflowDefinition);
 
         StateHasChanged();
     }
-
-    /// <summary>
+    
     /// Gets the currently selected workflow definition version.
-    /// </summary>
-    public WorkflowDefinition? GetSelectedWorkflowDefinitionVersion() => SelectedWorkflowDefinition;
-
-    /// <summary>
-    /// Refreshes the active workflow definition.
-    /// </summary>
-    public async Task RefreshActiveWorkflowAsync()
+    public WorkflowDefinition? GetSelectedWorkflowDefinitionVersion() => _selectedWorkflowDefinition;
+    
+    /// Determines whether the workspace is currently viewing a specific version of a workflow definition.
+    public bool IsSelectedDefinition(string definitionVersionId)
     {
-        var definitionId = WorkflowDefinition.DefinitionId;
-        var definition = await WorkflowDefinitionService.FindByDefinitionIdAsync(definitionId, VersionOptions.Latest);
-        SelectedWorkflowDefinition = definition!;
-        StateHasChanged();
+        return _selectedWorkflowDefinition?.Id == definitionVersionId;
+    }
+    
+    /// Gets the selected workflow definition.
+    public WorkflowDefinition? GetSelectedDefinition()
+    {
+        return _selectedWorkflowDefinition;
+    }
+    
+    /// Displays the latest version of a workflow definition asynchronously.
+    public async Task DisplayLatestWorkflowDefinitionVersionAsync()
+    {
+        var definitionId = _workflowDefinition!.DefinitionId;
+        var definition = (await InvokeWithBlazorServiceContext(() => WorkflowDefinitionService.FindByDefinitionIdAsync(definitionId, VersionOptions.Latest)))!;
+        await DisplayWorkflowDefinitionVersionAsync(definition);
     }
 
     private async Task OnWorkflowDefinitionPropsUpdated()
@@ -92,7 +109,8 @@ public partial class WorkflowDefinitionWorkspace : IWorkspace
 
     private async Task OnWorkflowDefinitionUpdated()
     {
-        SelectedWorkflowDefinition = WorkflowEditor.WorkflowDefinition!;
+        _workflowDefinition = WorkflowEditor.WorkflowDefinition!;
+        _selectedWorkflowDefinition = _workflowDefinition;
         StateHasChanged();
 
         if (WorkflowDefinitionUpdated != null)

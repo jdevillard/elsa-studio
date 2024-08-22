@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Elsa.Api.Client.Extensions;
+using Elsa.Api.Client.Resources.ActivityExecutions.Models;
 using Elsa.Api.Client.Resources.StorageDrivers.Models;
 using Elsa.Api.Client.Resources.WorkflowDefinitions.Models;
 using Elsa.Api.Client.Resources.WorkflowInstances.Enums;
@@ -19,35 +21,35 @@ namespace Elsa.Studio.Workflows.Components.WorkflowInstanceViewer.Components;
 public partial class WorkflowInstanceDetails
 {
     private WorkflowInstance? _workflowInstance;
-    private ActivityExecutionContextState? _workflowActivityExecutionContext;
+
+    private ActivityExecutionRecord? _workflowActivityExecutionRecord;
 
     /// <summary>
     /// Gets or sets the workflow instance to display.
     /// </summary>
-    [Parameter]
-    public WorkflowInstance? WorkflowInstance { get; set; }
+    [Parameter] public WorkflowInstance? WorkflowInstance { get; set; }
 
     /// <summary>
     /// Gets or sets the workflow definition associated with the workflow instance.
     /// </summary>
-    [Parameter]
-    public WorkflowDefinition? WorkflowDefinition { get; set; }
+    [Parameter] public WorkflowDefinition? WorkflowDefinition { get; set; }
 
     /// <summary>
     /// Gets or sets the current selected sub-workflow.
     /// </summary>
-    [Parameter]
-    public JsonObject? SelectedSubWorkflow { get; set; } = default!;
+    [Parameter] public JsonObject? SelectedSubWorkflow { get; set; }
+
+    /// <summary>
+    /// Gets or sets the current selected sub-workflow executions.
+    /// </summary>
+    [Parameter] public ICollection<ActivityExecutionRecord>? SelectedSubWorkflowExecutions { get; set; }
 
     [Inject] private IStorageDriverService StorageDriverService { get; set; } = default!;
-    [Inject] private IWorkflowInstanceObserverFactory WorkflowInstanceObserverFactory { get; set; } = default!;
     [Inject] private IWorkflowInstanceService WorkflowInstanceService { get; set; } = default!;
     [Inject] private IActivityRegistry ActivityRegistry { get; set; } = default!;
+    [Inject] private IActivityExecutionService ActivityExecutionService { get; set; } = default!;
 
-    private IDictionary<string, StorageDriverDescriptor> StorageDriverLookup { get; set; } =
-        new Dictionary<string, StorageDriverDescriptor>();
-
-    private IWorkflowInstanceObserver WorkflowInstanceObserver { get; set; } = default!;
+    private IDictionary<string, StorageDriverDescriptor> StorageDriverLookup { get; set; } = new Dictionary<string, StorageDriverDescriptor>();
 
     private IDictionary<string, DataPanelItem> WorkflowInstanceData
     {
@@ -74,21 +76,71 @@ public partial class WorkflowInstanceDetails
         }
     }
 
+    private Dictionary<string, DataPanelItem> WorkflowVariableData
+    {
+        get
+        {
+            return WorkflowDefinition == null 
+                ? new Dictionary<string, DataPanelItem>() 
+                : WorkflowDefinition.Variables.ToDictionary(entry => entry.Name, entry => new DataPanelItem(GetVariableValue(entry)));
+        }
+    }
+
+    private Dictionary<string, DataPanelItem> WorkflowInputData
+    {
+        get
+        {
+            if (_workflowInstance == null || WorkflowDefinition == null)
+                return new Dictionary<string, DataPanelItem>();
+
+            var inputData = new Dictionary<string, DataPanelItem>();
+            foreach (var input in WorkflowDefinition.Inputs)
+            {
+                _workflowInstance.WorkflowState.Input.TryGetValue(input.Name, out object? inputFromInstance);
+                var inputName = !string.IsNullOrWhiteSpace(input.DisplayName) ? input.DisplayName : input.Name;
+                inputData.Add(inputName, new DataPanelItem(inputFromInstance?.ToString()));
+            }
+
+            return inputData;
+        }
+    }
+
+    private Dictionary<string, DataPanelItem> WorkflowOutputData
+    {
+        get
+        {
+            if (_workflowInstance == null || WorkflowDefinition == null)
+                return new Dictionary<string, DataPanelItem>();
+
+            var outputData = new Dictionary<string, DataPanelItem>();
+            foreach (var output in WorkflowDefinition.Outputs)
+            {
+                _workflowInstance.WorkflowState.Output.TryGetValue(output.Name, out object? outputFromInstance);
+                var outputName = !string.IsNullOrWhiteSpace(output.DisplayName) ? output.DisplayName : output.Name;
+                outputData.Add(outputName, new DataPanelItem(outputFromInstance?.ToString()));
+            }
+
+            return outputData;
+        }
+    }
+
     private Dictionary<string, DataPanelItem> WorkflowInstanceSubWorkflowData
     {
         get
         {
             if (SelectedSubWorkflow == null)
-                return new ();
+                return new();
 
             var typeName = SelectedSubWorkflow.GetTypeName();
             var version = SelectedSubWorkflow.GetVersion();
             var descriptor = ActivityRegistry.Find(typeName, version);
-            var isWorkflowActivity = descriptor != null && descriptor.CustomProperties.TryGetValue("RootType", out var rootTypeNameElement) && ((JsonElement)rootTypeNameElement).GetString() == "WorkflowDefinitionActivity";
+            var isWorkflowActivity = descriptor != null &&
+                                     descriptor.CustomProperties.TryGetValue("RootType", out var rootTypeNameElement) &&
+                                     ((JsonElement)rootTypeNameElement).GetString() == "WorkflowDefinitionActivity";
             var workflowDefinitionId = isWorkflowActivity ? SelectedSubWorkflow.GetWorkflowDefinitionId() : default;
 
             if (workflowDefinitionId == null)
-                return new ();
+                return new();
 
             return new()
             {
@@ -101,9 +153,69 @@ public partial class WorkflowInstanceDetails
         }
     }
 
-    public void UpdateSubWorkflow(JsonObject? obj)
+    private Dictionary<string, DataPanelItem> SubWorkflowInputData
+    {
+        get
+        {
+            if (SelectedSubWorkflowExecutions == null || SelectedSubWorkflow == null)
+                return new Dictionary<string, DataPanelItem>();
+
+            var execution = SelectedSubWorkflowExecutions.LastOrDefault();
+            var inputData = new Dictionary<string, DataPanelItem>();
+            var activityState = execution?.ActivityState;
+            if (activityState != null)
+            {
+                var activityDescriptor =
+                    ActivityRegistry.Find(SelectedSubWorkflow.GetTypeName(), SelectedSubWorkflow.GetVersion())!;
+                foreach (var inputDescriptor in activityDescriptor.Inputs)
+                {
+                    var inputValue = activityState.TryGetValue(inputDescriptor.Name, out var value) ? value : default;
+                    inputData[inputDescriptor.DisplayName ?? inputDescriptor.Name] = new(inputValue?.ToString());
+                }
+            }
+
+            return inputData;
+        }
+    }
+
+    private Dictionary<string, DataPanelItem> SubWorkflowOutputData
+    {
+        get
+        {
+            if (SelectedSubWorkflowExecutions == null || SelectedSubWorkflow == null)
+                return new Dictionary<string, DataPanelItem>();
+
+            var execution = SelectedSubWorkflowExecutions.LastOrDefault();
+            var outputData = new Dictionary<string, DataPanelItem>();
+
+            if (execution != null)
+            {
+                var outputs = execution.Outputs;
+                var activityDescriptor =
+                    ActivityRegistry.Find(SelectedSubWorkflow.GetTypeName(), SelectedSubWorkflow.GetVersion())!;
+                var outputDescriptors = activityDescriptor.Outputs;
+
+                foreach (var outputDescriptor in outputDescriptors)
+                {
+                    var outputValue = outputs != null
+                        ? outputs.TryGetValue(outputDescriptor.Name, out var value) ? value : default
+                        : default;
+                    outputData[outputDescriptor.DisplayName ?? outputDescriptor.Name] = new(outputValue?.ToString());
+                }
+            }
+
+            return outputData;
+        }
+    }
+
+    /// Updates the selected sub-workflow.
+    public async Task UpdateSubWorkflowAsync(JsonObject? obj)
     {
         SelectedSubWorkflow = obj;
+        SelectedSubWorkflowExecutions = obj == null
+            ? null
+            : (await InvokeWithBlazorServiceContext(() =>
+                ActivityExecutionService.ListAsync(WorkflowInstance!.Id, obj.GetNodeId()!))).ToList();
         StateHasChanged();
     }
 
@@ -121,31 +233,22 @@ public partial class WorkflowInstanceDetails
         {
             _workflowInstance = WorkflowInstance;
 
-            if (_workflowInstance != null)
-            {
-                _workflowActivityExecutionContext = GetWorkflowActivityExecutionContext(_workflowInstance);
-
-                // If the workflow instance is still running, observe it.
-                if (_workflowInstance?.Status == WorkflowStatus.Running)
-                    await ObserveWorkflowInstanceAsync();
-            }
+            if (_workflowInstance != null) await GetWorkflowActivityExecutionRecordAsync(_workflowInstance.Id);
         }
     }
 
-    private async Task ObserveWorkflowInstanceAsync()
+    private async Task GetWorkflowActivityExecutionRecordAsync(string workflowInstanceId)
     {
-        WorkflowInstanceObserver = await WorkflowInstanceObserverFactory.CreateAsync(_workflowInstance!.Id);
-        WorkflowInstanceObserver.WorkflowInstanceUpdated += async _ => await InvokeAsync(async () =>
-        {
-            _workflowInstance = await WorkflowInstanceService.GetAsync(_workflowInstance!.Id);
-            _workflowActivityExecutionContext = GetWorkflowActivityExecutionContext(_workflowInstance!);
-            StateHasChanged();
-        });
+        _workflowActivityExecutionRecord = await GetLastWorkflowActivityExecutionRecordAsync(workflowInstanceId);
     }
 
-    private ActivityExecutionContextState? GetWorkflowActivityExecutionContext(WorkflowInstance workflowInstance)
+    private async Task<ActivityExecutionRecord?> GetLastWorkflowActivityExecutionRecordAsync(string workflowInstanceId)
     {
-        return workflowInstance.WorkflowState.ActivityExecutionContexts.FirstOrDefault(x => x.ParentContextId == null);
+        var rootWorkflowActivityExecutionContext = WorkflowInstance?.WorkflowState.ActivityExecutionContexts.FirstOrDefault(x => x.ParentContextId == null);
+        if (rootWorkflowActivityExecutionContext == null) return null;
+        var rootWorkflowActivityNodeId = rootWorkflowActivityExecutionContext.ScheduledActivityNodeId;
+        var records = await ActivityExecutionService.ListAsync(workflowInstanceId, rootWorkflowActivityNodeId);
+        return records.MaxBy(x => x.StartedAt);
     }
 
     private string GetStorageDriverDisplayName(string? storageDriverTypeName)
@@ -158,16 +261,21 @@ public partial class WorkflowInstanceDetails
             : descriptor.DisplayName;
     }
 
+    [RequiresUnreferencedCode("Calls System.Text.Json.JsonSerializer.Deserialize<TValue>(JsonSerializerOptions)")]
     private string GetVariableValue(Variable variable)
     {
         // TODO: Implement a REST API that returns values from the various storage providers, instead of hardcoding it here with hardcoded support for workflow storage only.
         var defaultValue = variable.Value?.ToString() ?? string.Empty;
 
-        if (_workflowActivityExecutionContext == null)
+        if (_workflowActivityExecutionRecord == null)
             return defaultValue;
 
-        if (!_workflowActivityExecutionContext.Properties.TryGetValue("PersistentVariablesDictionary",
-                out var variablesDictionaryObject))
+        var variablesDictionaryObject = _workflowActivityExecutionRecord.Properties.TryGetValue("PersistentVariablesDictionary", out var v1) 
+            ? v1 : _workflowActivityExecutionRecord.Properties.TryGetValue("Variables", out var v2) 
+                ? v2 
+                : null;  
+        
+        if (variablesDictionaryObject == null)
             return defaultValue;
 
         var dictionary = ((JsonElement)variablesDictionaryObject).Deserialize<IDictionary<string, object>>()!;

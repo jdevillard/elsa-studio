@@ -6,14 +6,14 @@
 
 @{
     
-    RenderFragment GetSelectComponent2(String propertyName, IDictionary<string, LogPersistenceMode> properties) =>
+    RenderFragment GetSelectComponent(String propertyName, IDictionary<string, LogPersistenceMode> properties) =>
 @<MudSelect Label="@propertyName"
                 T="LogPersistenceMode"
                     Variant="@MudBlazor.Variant.Outlined"
-                    Value="@InitorGetProperty(propertyName,properties)"
+                    Value="@GetProperty(propertyName,properties)"
                     ValueChanged="@((value) => SetProperty(propertyName,properties,value))"
                     ToStringFunc="@(x=> x.ToString())"
-                    ReadOnly="IsReadOnly"
+                    ReadOnly="IsReadOnly" Disabled="IsReadOnly"
                     SelectedValuesChanged="(values)=>OnBindingChanged()">
         @foreach (LogPersistenceMode item in Enum.GetValues(typeof(LogPersistenceMode)))
                 {
@@ -30,10 +30,10 @@
             <MudSelect Label="Default Configuration"
                        T=LogPersistenceMode
                        Variant="@MudBlazor.Variant.Outlined"
-                       Value="@persistenceConfiguration.Default"
-                       ValueChanged="@(async (bindingOption) => persistenceConfiguration.Default = bindingOption)"
+                       Value="@_persistenceConfiguration.Default"
+                       ValueChanged="@(async (bindingOption) => _persistenceConfiguration.Default = bindingOption)"
                        ToStringFunc="@(x=> x.ToString())"
-                       ReadOnly="IsReadOnly"
+                       ReadOnly="IsReadOnly" Disabled="IsReadOnly"
                        SelectedValuesChanged="(values)=>OnBindingChanged()">
                 @foreach (LogPersistenceMode item in Enum.GetValues(typeof(LogPersistenceMode)))
                 {
@@ -51,7 +51,7 @@
             }
             @foreach(var input in InputDescriptors)
             {   
-                @GetSelectComponent2(input.Name, persistenceConfiguration.Inputs);
+                @GetSelectComponent(input.Name, _persistenceConfiguration.Inputs);
             }
 
             <MudDivider />
@@ -64,10 +64,8 @@
             }
             @foreach (var output in OutputDescriptors)
             {
-                    @GetSelectComponent2(output.Name, persistenceConfiguration.Outputs);
+                @GetSelectComponent(output.Name, _persistenceConfiguration.Outputs);
             }
         </MudStack>
     </MudForm>
-
-    <MudOverlay Visible="@IsReadOnly" Absolute="true" />
  </div>

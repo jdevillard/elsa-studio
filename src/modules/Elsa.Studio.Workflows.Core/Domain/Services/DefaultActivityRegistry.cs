@@ -53,7 +53,6 @@ public class DefaultActivityRegistry : IActivityRegistry
     {
         // Return the latest version of each activity descriptor from _activityDescriptors.
         return _activityDescriptors.Values
-            .Where(x => x.IsBrowsable)
             .GroupBy(activityDescriptor => activityDescriptor.TypeName)
             .Select(grouping => grouping.OrderByDescending(y => y.Version).First());
     }
@@ -63,5 +62,13 @@ public class DefaultActivityRegistry : IActivityRegistry
     {
         version ??= 1;
         return _activityDescriptors.TryGetValue((activityType, version.Value), out var descriptor) ? descriptor : null;
+    }
+    
+    /// <inheritdoc />
+    public IEnumerable<ActivityDescriptor> FindAll(string activityType)
+    {
+        return _activityDescriptors
+            .Where(kvp => kvp.Key.ActivityTypeName == activityType)
+            .Select(kvp => kvp.Value);
     }
 }

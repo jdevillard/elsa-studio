@@ -1,14 +1,16 @@
+using Elsa.Api.Client.Resources.ActivityDescriptors.Models;
 using Elsa.Studio.Workflows.UI.Contracts;
 using Elsa.Studio.Workflows.UI.Models;
+using JetBrains.Annotations;
 using MudBlazor;
 
 namespace Elsa.Studio.Workflows.UI.Providers;
 
-/// <summary>
 /// Provides default activity display settings.
-/// </summary>
+[UsedImplicitly]
 public class DefaultActivityDisplaySettingsProvider : IActivityDisplaySettingsProvider
 {
+    /// <param name="activityDescriptor"></param>
     /// <inheritdoc />
     public IDictionary<string, ActivityDisplaySettings> GetSettings() => new Dictionary<string, ActivityDisplaySettings>
     {
@@ -48,6 +50,7 @@ public class DefaultActivityDisplaySettingsProvider : IActivityDisplaySettingsPr
         ["Elsa.WriteFileHttpResponse"] = new(DefaultActivityColors.Http, Icons.Material.Outlined.FileDownload),
         ["Elsa.SendHttpRequest"] = new(DefaultActivityColors.Http, ElsaStudioIcons.Tabler.World),
         ["Elsa.FlowSendHttpRequest"] = new(DefaultActivityColors.Http, ElsaStudioIcons.Tabler.World),
+        ["Elsa.DownloadHttpFile"] = new(DefaultActivityColors.Http, @Icons.Material.Outlined.CloudDownload),
         
         // Looping
         ["Elsa.While"] = new(DefaultActivityColors.Looping, ElsaStudioIcons.Tabler.RepeatOne),

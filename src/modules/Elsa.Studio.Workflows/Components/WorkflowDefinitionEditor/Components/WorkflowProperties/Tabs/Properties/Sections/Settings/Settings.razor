@@ -17,21 +17,21 @@
                 ToStringFunc="@(x => x?.DisplayName ?? string.Empty)"
                 ValueChanged="@OnActivationStrategyChanged"
                 HelperText="@(_selectedActivationStrategy?.Description)"
-                ReadOnly="IsReadOnly">
+                ReadOnly="IsReadOnly" Disabled="IsReadOnly">
                 @foreach (var strategy in _activationStrategies)
                 {
                     <MudSelectItem T="WorkflowActivationStrategyDescriptor" Value="@strategy">@strategy.DisplayName</MudSelectItem>
                 }
             </MudSelect>
             <MudSelect
-                T="IncidentStrategyDescriptor"
+                T="IncidentStrategyDescriptor?"
                 Label="Incident handling strategy"
                 Variant="@Variant.Outlined"
                 Value="@_selectedIncidentStrategy"
                 ToStringFunc="@(x => x?.DisplayName ?? "Default")"
                 ValueChanged="@OnIncidentStrategyChanged"
                 HelperText="@(_selectedIncidentStrategy?.Description)"
-                ReadOnly="IsReadOnly">
+                ReadOnly="IsReadOnly" Disabled="IsReadOnly">
                 @foreach (var strategy in _incidentStrategies)
                 {
                     <MudSelectItem T="IncidentStrategyDescriptor" Value="@strategy">@(strategy?.DisplayName ?? "Default")</MudSelectItem>
@@ -39,25 +39,24 @@
             </MudSelect>
             <MudSelect
                 Label="Log Persistence Mode"
-                       T="LogPersistenceMode?"
-                       Variant="@Variant.Outlined"
-                       Value="@_selectedLogPersistenceMode"
-                       ValueChanged="@OnLogPersistenceModeChanged"
-                       ReadOnly="IsReadOnly">
+                T="LogPersistenceMode?"
+                Variant="@Variant.Outlined"
+                Value="@_selectedLogPersistenceMode"
+                ValueChanged="@OnLogPersistenceModeChanged"
+                ReadOnly="IsReadOnly" Disabled="IsReadOnly">
                 @foreach (LogPersistenceMode item in Enum.GetValues(typeof(LogPersistenceMode)))
                 {
-                    <MudSelectItem Value="@((LogPersistenceMode?) item)">@item</MudSelectItem>
+                    <MudSelectItem Value="@((LogPersistenceMode?)item)">@item</MudSelectItem>
                 }
-
             </MudSelect>
             <MudField Variant="Variant.Text" HelperText="Allow this workflow to be used as an activity." Margin="Margin.None">
                 <MudCheckBox
                     T="bool?"
                     Label="Usable as activity"
-                    Checked="@(WorkflowDefinition.Options.UsableAsActivity == true)"
-                    CheckedChanged="@OnUsableAsActivityCheckChanged"
-                    Dense="                    true"
-                    ReadOnly="                    IsReadOnly"/>
+                    Value="@(WorkflowDefinition.Options.UsableAsActivity == true)"
+                    ValueChanged="@OnUsableAsActivityCheckChanged"
+                    Dense="true"
+                    ReadOnly="IsReadOnly" Disabled="IsReadOnly"/>
             </MudField>
             @if (WorkflowDefinition.Options.UsableAsActivity == true)
             {
@@ -66,17 +65,27 @@
                         T="bool?"
                         Label="Auto-update consuming workflows"
                         Dense="@true"
-                        Checked="@(WorkflowDefinition.Options.AutoUpdateConsumingWorkflows)"
-                        CheckedChanged="@OnAutoUpdateConsumingWorkflowsCheckChanged"
-                        ReadOnly="                        IsReadOnly"/>
+                        Value="@(WorkflowDefinition.Options.AutoUpdateConsumingWorkflows)"
+                        ValueChanged="@OnAutoUpdateConsumingWorkflowsCheckChanged"
+                        ReadOnly="IsReadOnly" Disabled="IsReadOnly"/>
                 </MudField>
+                @* <MudSelect *@
+                @*     T="string" *@
+                @*     Label="Resolution Strategy" *@
+                @*     Variant="@Variant.Outlined" *@
+                @*     HelperText="What should we do when a consuming workflow is published and also has a draft version?" *@
+                @*     ReadOnly="IsReadOnly" Disabled="IsReadOnly"> *@
+                @*     <MudSelectItem T="string">Update Draft</MudSelectItem> *@
+                @*     <MudSelectItem T="string">Update Draft and Publish</MudSelectItem> *@
+                @*     <MudSelectItem T="string">Discard Draft and Publish</MudSelectItem> *@
+                @* </MudSelect> *@
                 <MudTextField
                     T="string"
                     Variant="Variant.Outlined"
                     Label="Category"
                     HelperText="A custom activity category to assign this workflow-as-an-activity to."
                     Value="@WorkflowDefinition.Options.ActivityCategory"
-                    ValueChanged="OnCategoryChanged"/>
+                    ValueChanged="OnCategoryChanged" ReadOnly="IsReadOnly" Disabled="IsReadOnly"/>
             }
         </MudStack>
     </div>
